@@ -16,4 +16,5 @@ CUDA 12.1 (for GPU acceleration)
 The tetrahedral meshing of the sampled points is performed to create graph structured data. All the sampling points and the other densifying points are both included into the graph data. 
 ```python
 python tetra_partition_dem_control_scipy_delaunay.py --output graph_data.pt
+```
 ## Step 2: Build a knowledge graph
