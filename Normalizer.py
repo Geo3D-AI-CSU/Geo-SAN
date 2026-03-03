@@ -15,17 +15,16 @@ class Normalizer:
         self.level_scaler.fit(level_np)
         level_norm = self.level_scaler.transform(level_np)
         return torch.tensor(level_norm.squeeze(), dtype=torch.float32).to(
-            level_masked.device)  # 修改: 使用 squeeze() 使其成为一维张量
+            level_masked.device)  # Modify: Use squeeze() to make it a one-dimensional tensor
 
     def inverse_transform_level(self, level_norm):
         """
-        🔧 修复：
-        1. 添加 .detach() 以避免梯度错误
-        2. 使用 .squeeze() 确保返回1D张量
+        1. Add .detach() to prevent gradient errors.
+        2. Use .squeeze() to ensure a 1D tensor is returned.
         """
         level_np = level_norm.detach().cpu().numpy().reshape(-1, 1)
         level_original = self.level_scaler.inverse_transform(level_np)
-        # 返回1D张量，避免维度不匹配
+        # Return a 1D tensor to avoid dimension mismatches.
         return torch.tensor(level_original.squeeze(), dtype=torch.float32).to(level_norm.device)
 
     def fit_transform_coords(self, coords):
@@ -40,52 +39,45 @@ class Normalizer:
 
     def fit_transform_values(self, min_values, max_values):
         """
-        对 min_values 和 max_values 进行归一化到 [0, 1] 区间。
-        忽略 -9999 的值，不对其进行归一化。
+        Normalise min_values and max_values to the interval [0, 1].
+        Ignore values of -9999 and do not normalise them.
         """
-        # 转换为numpy数组进行处理
+        # Convert to a NumPy array for processing
         min_values = np.array(min_values)
         max_values = np.array(max_values)
 
-        # 归一化处理，使用有效数据（忽略 -9999 的值）
-        valid_mask_min = min_values != -9999  # 标记有效的 min_values
-        valid_mask_max = max_values != -9999  # 标记有效的 max_values
+        # Normalisation processing, utilising valid data (ignoring values of -9999)
+        valid_mask_min = min_values != -9999  # Mark valid min_values
+        valid_mask_max = max_values != -9999  # Mark valid max_values
 
-        # 归一化 min_values 和 max_values，仅对有效值进行归一化
+        # Normalise min_values and max_values, normalising only valid values.
         min_values_norm = np.copy(min_values)
         max_values_norm = np.copy(max_values)
         max_values_norm = max_values_norm.astype(np.float64)
         min_values_norm = min_values_norm.astype(np.float64)
-        # 仅对有效值部分进行归一化
-        if np.any(valid_mask_min):  # 确保有效的min值部分存在
-            valid_min_values = min_values[valid_mask_min]  # 获取有效部分
+        # Normalise only the effective value portion
+        if np.any(valid_mask_min):  # Ensure the effective minimum value portion is present
+            valid_min_values = min_values[valid_mask_min]  # Obtain the valid portion
             min_norm = (valid_min_values - valid_min_values.min()) / (
-                        valid_min_values.max() - valid_min_values.min())  # 归一化有效部分
-            min_values_norm[valid_mask_min] = min_norm  # 将归一化结果赋值回
+                        valid_min_values.max() - valid_min_values.min())  # Normalised effective portion
+            min_values_norm[valid_mask_min] = min_norm  # Return the normalised result as an assigned value.
 
-        if np.any(valid_mask_max):  # 确保有效的max值部分存在
-            valid_max_values = max_values[valid_mask_max]  # 获取有效部分
+        if np.any(valid_mask_max):  # Ensure the presence of the effective maximum value section
+            valid_max_values = max_values[valid_mask_max]  # Obtain the valid portion
             max_norm = (valid_max_values - valid_max_values.min()) / (
-                        valid_max_values.max() - valid_max_values.min())  # 归一化有效部分
-            max_values_norm[valid_mask_max] = max_norm  # 将归一化结果赋值回
+                        valid_max_values.max() - valid_max_values.min())  # Normalised effective portion
+            max_values_norm[valid_mask_max] = max_norm  # Return the normalised result as an assigned value.
 
         return min_values_norm, max_values_norm
 
     def inverse_transform_values(self, min_values_norm, max_values_norm, min_values, max_values):
-        """
-        对 min_values 和 max_values 进行反归一化，恢复到原始范围。
-        忽略 -9999 的值，不对其进行反归一化。
-        """
-        # 转换为numpy数组进行处理
         min_values_norm = np.array(min_values_norm)
         max_values_norm = np.array(max_values_norm)
         min_values = np.array(min_values)
         max_values = np.array(max_values)
 
-        # 过滤掉 -9999 的值
         valid_mask = (min_values_norm != -9999) & (max_values_norm != -9999)
 
-        # 反归一化
         min_values_original = np.copy(min_values_norm)
         max_values_original = np.copy(max_values_norm)
 
