@@ -1,5 +1,5 @@
 """
-结果分析和可视化脚本
+Results Analysis and Visualisation Script
 """
 import numpy as np
 import pandas as pd
@@ -12,13 +12,12 @@ import re
 
 def parse_training_log(log_file):
     """
-    解析训练日志，提取关键指标
+    Analyse training logs to extract key metrics
 
-    返回:
-    - metrics_df: DataFrame包含每个epoch的指标
+    Return:
+    - metrics_df: The DataFrame contains metrics for each epoch.
     """
     if not os.path.exists(log_file):
-        print(f"⚠️  日志文件不存在: {log_file}")
         return None
 
     data = {
@@ -46,7 +45,7 @@ def parse_training_log(log_file):
     current_epoch = None
 
     for i, line in enumerate(lines):
-        # 提取epoch
+        # Extract epoch
         if 'Epoch' in line and '/' in line:
             try:
                 epoch = int(line.split('Epoch')[1].split('/')[0].strip())
@@ -54,12 +53,12 @@ def parse_training_log(log_file):
             except:
                 continue
 
-        # 提取训练指标
+        # Extract training metrics
         if '[TRAIN]' in line and current_epoch:
             try:
                 data['epoch'].append(current_epoch)
 
-                # 提取各项损失
+                # Recover all losses
                 level = float(re.search(r'Level: ([\d.]+)', line).group(1))
                 grad = float(re.search(r'Grad: ([\d.]+)', line).group(1))
                 rock = float(re.search(r'Rock: ([\d.]+)', line).group(1))
@@ -68,7 +67,7 @@ def parse_training_log(log_file):
                 data['train_grad_loss'].append(grad)
                 data['train_rock_loss'].append(rock)
 
-                # 地层约束损失（如果有）
+                # Stratigraphic loss
                 if 'Strat:' in line:
                     strat = float(re.search(r'Strat: ([\d.]+)', line).group(1))
                     data['train_strat_loss'].append(strat)
@@ -84,13 +83,13 @@ def parse_training_log(log_file):
                 data['train_r2'].append(r2)
                 data['train_acc'].append(acc)
             except:
-                # 如果解析失败，移除当前epoch
+                # If resolution fails, remove the current epoch.
                 if data['epoch'] and data['epoch'][-1] == current_epoch:
                     for key in data:
                         if data[key] and len(data[key]) > 0:
                             data[key].pop()
 
-        # 提取测试指标
+        # Extract test metrics
         if '[TEST]' in line and current_epoch:
             try:
                 level = float(re.search(r'Level: ([\d.]+)', line).group(1))
@@ -115,7 +114,6 @@ def parse_training_log(log_file):
                 data['test_r2'].append(r2)
                 data['test_acc'].append(acc)
 
-                # 修正后的精度
                 if 'Acc_Corrected:' in line:
                     acc_corr = float(re.search(r'Acc_Corrected: ([\d.]+)', line).group(1))
                     data['test_acc_corrected'].append(acc_corr)
