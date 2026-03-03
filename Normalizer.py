@@ -9,7 +9,7 @@ class Normalizer:
 
     def fit_transform_level_masked(self, level_masked):
         """
-        仅对掩码节点的 level 进行归一化，并拟合 scaler。
+        Normalise only the level of the masked node and fit the scaler.
         """
         level_np = level_masked.cpu().numpy().reshape(-1, 1)
         self.level_scaler.fit(level_np)
