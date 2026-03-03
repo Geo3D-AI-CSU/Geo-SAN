@@ -17,4 +17,10 @@ The tetrahedral meshing of the sampled points is performed to create graph struc
 ```python
 python tetra_partition_dem_control_scipy_delaunay.py --output graph_data.pt
 ```
-## Step 2: Build a knowledge graph
+## Step 2: Network training
+A Geo-SAN network is designed to simultaneously complete lithological classification and scalar field interpolation. 
+```python
+python train.py --output final_model_constrained.pth
+```
+## Step 3: Stratigraphic model
+Visualisation of the predicted results through GOCAD software, primarily encompassing stratigraphic model and scalar field model.
