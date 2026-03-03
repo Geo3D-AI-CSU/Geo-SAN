@@ -5,33 +5,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-# ============================================================================
-# 方案1: 基础三层扩展版本
-# ============================================================================
+
 class GATSAGEMultiTaskPredictor_V1(nn.Module):
-    """
-    改进版本1: 基础三层扩展
-
-    架构说明:
-    - GAT: 3层图注意力网络，捕获局部注意力模式
-    - GraphSAGE: 3层邻域聚合网络，聚合邻域信息
-    - 特征融合: 简单拼接 + 线性变换
-    - 任务头: 分别用于Level预测(回归)和Rock分类(分类)
-
-    改进点:
-    1. 将GAT和GraphSAGE都扩展到3层
-    2. 每层后添加LayerNorm稳定训练
-    3. GAT最后一层使用平均聚合(concat=False)
-    4. 适当的Dropout防止过拟合
-
-    参数:
-    - in_channels: 输入特征维度 (3 + 断层特征数)
-    - hidden_channels: 隐藏层维度
-    - gat_heads: GAT注意力头数
-    - num_classes: 岩性分类类别数
-    - dropout: Dropout概率
-    - activation_fn: 激活函数类型 ('prelu' or 'softplus')
-    """
 
     def __init__(self, in_channels, hidden_channels=128, gat_heads=2,
                  num_classes=13, dropout=0.0, activation_fn='prelu'):
@@ -40,18 +15,6 @@ class GATSAGEMultiTaskPredictor_V1(nn.Module):
         self.dropout = dropout
         self.gat_heads = gat_heads
 
-        print(f"\n{'=' * 80}")
-        print(f"🏗️  初始化 ")
-        print(f"{'=' * 80}")
-        print(f"  输入维度: {in_channels}")
-        print(f"  隐藏维度: {hidden_channels}")
-        print(f"  GAT注意力头数: {gat_heads}")
-        print(f"  岩性类别数: {num_classes}")
-        print(f"  Dropout概率: {dropout}")
-        print(f"  激活函数: {activation_fn}")
-        print(f"{'=' * 80}\n")
-
-        # ========== GAT特征提取 (3层) ==========
         # 第1层: in_channels -> hidden_channels * gat_heads
         self.gat1 = GATConv(
             in_channels,
@@ -83,7 +46,6 @@ class GATSAGEMultiTaskPredictor_V1(nn.Module):
         )
         self.gat_norm3 = nn.LayerNorm(hidden_channels)
 
-        # ========== GraphSAGE特征提取 (3层) ==========
         # 接收GAT的输出，维度为 hidden_channels
         self.sage1 = SAGEConv(hidden_channels, hidden_channels, aggr='mean')
         self.sage_norm1 = nn.LayerNorm(hidden_channels)
@@ -204,99 +166,6 @@ class GATSAGEMultiTaskPredictor_V1(nn.Module):
 
         return level_output, rock_output
 
-
-# ============================================================================
-# 保留原有模型以保持兼容性
-# ============================================================================
-class GATSAGEMultiTaskPredictor(nn.Module):
-    """
-    原始版本 (兼容性保留)
-    GAT: 2层 + GraphSAGE: 2层
-    """
-
-    def __init__(self, in_channels, hidden_channels=128, gat_heads=2,
-                 num_classes=13, dropout=0.0, activation_fn='prelu'):
-        super(GATSAGEMultiTaskPredictor, self).__init__()
-
-        self.dropout = dropout
-        self.gat_heads = gat_heads
-
-        # ========== 图特征提取层 ==========
-        # GAT层 - 捕获局部注意力模式
-        self.gat1 = GATConv(in_channels, hidden_channels, heads=gat_heads, dropout=dropout)
-        self.gat2 = GATConv(hidden_channels * gat_heads, hidden_channels, heads=gat_heads, dropout=dropout)
-
-        # GraphSAGE层 - 聚合邻域信息
-        self.sage1 = SAGEConv(hidden_channels * gat_heads, hidden_channels, aggr='mean')
-        self.sage2 = SAGEConv(hidden_channels, hidden_channels, aggr='mean')
-
-        # 特征融合层 - 融合GAT和SAGE的输出
-        self.fusion = nn.Linear(hidden_channels * gat_heads + hidden_channels, hidden_channels)
-
-        # ========== MLP任务头 ==========
-        # Level预测分支 (回归)
-        self.level_mlp = nn.Sequential(
-            nn.Linear(hidden_channels, hidden_channels // 2),
-            nn.PReLU() if activation_fn == 'prelu' else nn.Softplus(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_channels // 2, hidden_channels // 4),
-            nn.PReLU() if activation_fn == 'prelu' else nn.Softplus(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_channels // 4, 1)
-        )
-
-        # 岩性分类分支 (分类)
-        self.rock_mlp = nn.Sequential(
-            nn.Linear(hidden_channels, hidden_channels // 2),
-            nn.PReLU() if activation_fn == 'prelu' else nn.Softplus(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_channels // 2, hidden_channels // 4),
-            nn.PReLU() if activation_fn == 'prelu' else nn.Softplus(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_channels // 4, num_classes)
-        )
-
-        # 激活函数
-        if activation_fn == 'softplus':
-            self.activation = nn.Softplus()
-        else:
-            self.activation = nn.PReLU()
-
-    def forward(self, x, edge_index):
-        # ========== GAT特征提取 ==========
-        gat_out = self.gat1(x, edge_index)
-        gat_out = self.activation(gat_out)
-        gat_out = F.dropout(gat_out, p=self.dropout, training=self.training)
-
-        gat_out = self.gat2(gat_out, edge_index)
-        gat_out = self.activation(gat_out)
-        gat_out = F.dropout(gat_out, p=self.dropout, training=self.training)
-
-        # ========== GraphSAGE特征提取 ==========
-        sage_out = self.sage1(gat_out, edge_index)
-        sage_out = self.activation(sage_out)
-        sage_out = F.dropout(sage_out, p=self.dropout, training=self.training)
-
-        sage_out = self.sage2(sage_out, edge_index)
-        sage_out = self.activation(sage_out)
-        sage_out = F.dropout(sage_out, p=self.dropout, training=self.training)
-
-        # ========== 特征融合 ==========
-        fused_features = torch.cat([gat_out, sage_out], dim=-1)
-        fused_features = self.fusion(fused_features)
-        fused_features = self.activation(fused_features)
-        fused_features = F.dropout(fused_features, p=self.dropout, training=self.training)
-
-        # ========== 多任务预测 ==========
-        level_output = self.level_mlp(fused_features).squeeze(-1)
-        rock_output = self.rock_mlp(fused_features)
-
-        return level_output, rock_output
-
-
-# ============================================================================
-# 其他保留的模型类 (保持兼容性)
-# ============================================================================
 
 class GATLevelPredictor(nn.Module):
     """GAT Level预测器 (单任务)"""
