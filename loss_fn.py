@@ -4,106 +4,103 @@ import torch.nn.functional as F
 
 def scalar_loss_slow(predicted_scalar, rock_unit_labels, min_values, max_values):
     """
-    计算岩性标量场的损失函数，确保预测的标量值在指定的范围内，处理缺失的最小值和最大值。
+    Compute the loss function for the lithological scalar field, 
+    ensuring predicted scalar values remain within the specified range, 
+    whilst handling missing minimum and maximum values.
 
-    参数：
-    - predicted_scalar (Tensor): 预测的标量场值，形状为 (num_nodes, )。
-    - rock_unit_labels (Tensor): 岩性标签，形状为 (num_nodes, )，用于查找对应的范围。
-    - min_values (Tensor or None): 每个岩性标签对应的最小标量场值，形状为 (num_labels, )，可以为 None。
-    - max_values (Tensor or None): 每个岩性标签对应的最大标量场值，形状为 (num_labels, )，可以为 None。
+    Parameters：
+    - predicted_scalar (Tensor): Predicted scalar field values, in the shape of (num_nodes, )
+    - rock_unit_labels (Tensor): Lithological tag, of shape (num_nodes, ), used to locate the corresponding range.
+    - min_values (Tensor or None): The minimum scalar field value corresponding to each lithological label, shaped as (num_labels, ), may be None.
+    - max_values (Tensor or None): The maximum scalar field value corresponding to each lithological label, shaped as (num_labels, ), may be None.
 
-    返回：
-    - loss (Tensor): 计算得到的损失值。
+   RETURN：
+    - loss (Tensor): The calculated loss value.
     """
 
-    # 获取岩性标签对应的最小值和最大值
+    # Obtain the minimum and maximum values corresponding to the lithological labels
     min_values_for_labels = min_values[rock_unit_labels] if min_values != -9999 else -9999
     max_values_for_labels = max_values[rock_unit_labels] if max_values != -9999 else -9999
 
-    # 将min_values和max_values在设备上与predicted_scalar保持一致
+    # Ensure that min_values and max_values align with predicted_scalar on the device.
     if min_values_for_labels is not -9999:
         min_values_for_labels = min_values_for_labels.to(predicted_scalar.device)
     if max_values_for_labels is not -9999:
         max_values_for_labels = max_values_for_labels.to(predicted_scalar.device)
 
-    # 初始化损失值
+    # Initialise loss value
     loss = torch.zeros_like(predicted_scalar,requires_grad=True)
 
-    # 遍历每个节点并计算损失
+    # Iterate through each node and compute the loss
     for i in range(len(predicted_scalar)):
         min_value = min_values_for_labels[i]
         max_value = max_values_for_labels[i]
         scalar_value = predicted_scalar[i]
 
-        # 判断 min_value 和 max_value 的值并计算损失
+        # Determine the values of min_value and max_value and calculate the loss.
         if min_value == -9999 and max_value == -9999:
-            continue  # 如果两个都为 -9999，跳过该节点的损失计算
-
+            continue 
         if min_value == -9999:
-            # 如果 min_value 是 -9999，损失为 |predicted_scalar - max_value|，当 predicted_scalar > max_value 时
             loss = torch.where(scalar_value > max_value, torch.abs(scalar_value - max_value), loss)
         elif max_value == -9999:
-            # 如果 max_value 是 -9999，损失为 |predicted_scalar - min_value|，当 predicted_scalar < min_value 时
             loss = torch.where(scalar_value < min_value, torch.abs(scalar_value - min_value), loss)
         else:
-            # 如果 min_value 和 max_value 都不为 -9999，分别计算两种情况的损失
             loss = torch.where(scalar_value > max_value, torch.abs(scalar_value - max_value), loss)
             loss = torch.where(scalar_value < min_value, torch.abs(scalar_value - min_value), loss)
 
-    return loss.sum()  # 返回损失值
+    return loss.sum() 
 
 
 def scalar_loss(predicted_scalar, rock_unit_labels, min_values, max_values):
     """
-    计算岩性标量场的损失函数，确保预测的标量值在指定的范围内，处理缺失的最小值和最大值。
+    Compute the loss function for the lithological scalar field,
+    ensuring predicted scalar values remain within the specified range, 
+    whilst handling missing minimum and maximum values.
 
-    参数：
-    - predicted_scalar (Tensor): 预测的标量场值，形状为 (num_nodes, )。
-    - rock_unit_labels (Tensor): 岩性标签，形状为 (num_nodes, )，用于查找对应的范围。
-    - min_values (Tensor or None): 每个岩性标签对应的最小标量场值，形状为 (num_labels, )，可以为 None。
-    - max_values (Tensor or None): 每个岩性标签对应的最大标量场值，形状为 (num_labels, )，可以为 None。
+    Parameters：
+    - predicted_scalar (Tensor):  The predicted scalar field values, in the shape of (num_nodes, ).
+    - rock_unit_labels (Tensor): Lithological tag, of shape (num_nodes, ), used to locate the corresponding range.
+    - min_values (Tensor or None): The minimum scalar field value corresponding to each lithological label, shaped as (num_labels, ), may be None.
+    - max_values (Tensor or None): The maximum scalar field value corresponding to each lithological label, shaped as (num_labels, ), may be None.
 
-    返回：
-    - loss (Tensor): 计算得到的损失值。
+    RETURN：
+    - loss (Tensor): The calculated loss value.
     """
 
-    # 获取岩性标签对应的最小值和最大值
-    min_values_for_labels = min_values[rock_unit_labels-1]  # 获取每个岩性标签对应的最小值
-    max_values_for_labels = max_values[rock_unit_labels-1]  # 获取每个岩性标签对应的最大值
+    # Obtain the minimum and maximum values corresponding to the lithological labels
+    min_values_for_labels = min_values[rock_unit_labels-1]  # Obtain the minimum value corresponding to each lithological label
+    max_values_for_labels = max_values[rock_unit_labels-1]  # Obtain the maximum value corresponding to each lithological label
 
-    # 将min_values和max_values在设备上与predicted_scalar保持一致
+    # Ensure that min_values and max_values align with predicted_scalar on the device.
     min_values_for_labels = min_values_for_labels.to(predicted_scalar.device)
     max_values_for_labels = max_values_for_labels.to(predicted_scalar.device)
 
-    # 初始化损失值
+    # Initialise loss value
     loss = torch.zeros_like(predicted_scalar, requires_grad=True)
 
-    # 计算标量值的损失
+    # Calculate the loss of scalar values
     min_mask = min_values_for_labels != -9999
     max_mask = max_values_for_labels != -9999
 
-    # 处理 min_value 为 -9999 的情况
     loss = torch.where(~min_mask & max_mask & (predicted_scalar > max_values_for_labels),
                         torch.abs(predicted_scalar - max_values_for_labels),
                         loss)
 
-    # 处理 max_value 为 -9999 的情况
     loss = torch.where(~max_mask & min_mask & (predicted_scalar < min_values_for_labels),
                         torch.abs(predicted_scalar - min_values_for_labels),
                         loss)
 
-    # 处理 min_value 和 max_value 都不为 -9999 的情况
     loss = torch.where(min_mask & max_mask & (predicted_scalar > max_values_for_labels),
                         torch.abs(predicted_scalar - max_values_for_labels),
                         loss)
     loss = torch.where(min_mask & max_mask & (predicted_scalar < min_values_for_labels),
                         torch.abs(predicted_scalar - min_values_for_labels),
                         loss)
-    # 返回所有节点的损失值之和
+    # The sum of the loss values for all nodes
     return loss.sum()
 
 
-# 定义损失函数
+# Define the loss function
 def level_loss(predicted, target):
     return  F.mse_loss(predicted, target)
 
@@ -113,47 +110,42 @@ def rock_unit_loss(predicted_rock_units, rock_unit_labels):
 
 def gradient_loss(predicted_levels, coords, dx, dy, dz, edge_index, mask_gradient):
     """
-    计算梯度损失。
-    :param predicted_levels: 预测的level值
-    :param coords: 节点坐标
-    :param dx, dy, dz: 真实梯度（已知）
-    :param edge_index: 图的边索引
-    :param mask_gradient: 掩码，指定哪些节点需要计算梯度
-    :return: 梯度损失
-    mask_sample: 用于指示哪些节点需要计算梯度,有邻居节点的节点才计算梯度
+    Compute the gradient loss.
+    :param predicted_levels: Predicted level value
+    :param coords: Node coordinates
+    :param dx, dy, dz: True gradient
+    :param edge_index: Edge index of the graph
+    :param mask_gradient: Mask, specifying which nodes require gradient computation
+    :return: Gradient loss
+    mask_sample: Used to indicate which nodes require gradient computation; only nodes with neighbouring nodes shall compute gradients.
     """
     mask_indices = torch.nonzero(mask_gradient, as_tuple=False).squeeze()
-    mask_sample = torch.zeros(mask_indices .size(0), dtype=torch.bool)  # 默认全为 False，表示没有邻居
+    mask_sample = torch.zeros(mask_indices .size(0), dtype=torch.bool)  
     row, col = edge_index
     gradients = []
-    # 确保 dx, dy, dz 有梯度支持
-    # dx.requires_grad_(True)
-    # dy.requires_grad_(True)
-    # dz.requires_grad_(True)
 
-    # 遍历每个节点，检查是否有邻居，有的话给它设置成True
-    # 提前计算 row == node 和 col == node 的布尔数组，减少重复计算
+    # Precompute the Boolean array for row == node and col == node to minimise redundant calculations.
     for i, node in enumerate(mask_indices):
-        row_mask = (row == node)  # 记录 row 中是否等于 node
-        col_mask = (col == node)  # 记录 col 中是否等于 node
+        row_mask = (row == node) 
+        col_mask = (col == node)  
 
-        # 查找 row 和 col 中与当前 node 相关的邻居
-        col_neighbors = col[row_mask]  # row 中的邻居
-        row_neighbors = row[col_mask]  # col 中的邻居
+        # Identify the neighbours within row and col that are associated with the current node.
+        col_neighbors = col[row_mask]  
+        row_neighbors = row[col_mask]
 
-        # 合并 row 和 col 中的邻居
+        # Merge neighbouring rows and columns
         neighbors = torch.cat((row_neighbors, col_neighbors))
 
-        # 更新掩码，检查是否有邻居
+        # Update the mask, check for neighbours
         if neighbors.numel() > 0:
-            mask_sample[i] = True  # 有邻居，掩码为 True
+            mask_sample[i] = True  
         else:
-            mask_sample[i] = False  # 没有邻居，掩码为 False
+            mask_sample[i] = False  
 
-        # 跳过没有邻居的节点
+        # Skip nodes with no neighbours
         if not mask_sample[i]:
-            gradients.append(torch.zeros(3, device=predicted_levels.device))  # 无邻居节点梯度为 [0, 0, 0]
-            continue  # 跳过没有邻居的节点
+            gradients.append(torch.zeros(3, device=predicted_levels.device)) 
+            continue
 
         neighbors_v = neighbors
         # 计算delta_coords和delta_levels
