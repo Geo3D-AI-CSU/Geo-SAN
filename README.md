@@ -23,4 +23,4 @@ A Geo-SAN network is designed to simultaneously complete lithological classifica
 python train.py --output final_model_constrained.pth
 ```
 ## Step 3: Stratigraphic model
-Visualisation of the predicted results through GOCAD software, primarily encompassing stratigraphic model and scalar field model.
+Scalar and stratigraphic models are saved in VTP data format.
